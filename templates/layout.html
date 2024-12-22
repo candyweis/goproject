@@ -1,0 +1,28 @@
+{{ define "layout" }}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <title>My Go Project</title>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+  <header>
+    <h1>My Go Project</h1>
+    <nav>
+      <a href="/">Главная</a> |
+      <a href="/register">Регистрация</a> |
+      <a href="/login">Вход</a> |
+      <a href="/logout">Выход</a>
+    </nav>
+  </header>
+
+  <hr/>
+
+  {{ block "content" . }}{{ end }}
+
+  <hr/>
+  <footer>© 2024 My-Go-Project</footer>
+</body>
+</html>
+{{ end }}

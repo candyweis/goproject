@@ -1,0 +1,14 @@
+{{ define "content" }}
+<h2>Регистрация</h2>
+<form method="POST" action="/register">
+  <label>Email:</label><br/>
+  <input type="email" name="email" required/><br/><br/>
+
+  <label>Пароль:</label><br/>
+  <input type="password" name="password" required/><br/><br/>
+
+  {{ if . }}<p style="color:red;">{{ . }}</p>{{ end }}
+
+  <button type="submit">Зарегистрироваться</button>
+</form>
+{{ end }}
