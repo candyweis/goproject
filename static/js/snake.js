@@ -1,3 +1,4 @@
+// static/js/snake.js
 const canvas = document.getElementById("snakeCanvas");
 const ctx = canvas.getContext("2d");
 
@@ -15,7 +16,31 @@ let velocityY = 0;
 let foodX = 5;
 let foodY = 5;
 
+let score = 0;
+let gameOver = false;
+
+// Отрисовка HUD
+function drawHUD() {
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText(`Очки: ${score}`, 10, 20);
+}
+
 function gameLoop() {
+  if (gameOver) {
+    // Отображение сообщения об окончании игры
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
+    ctx.fillStyle = "white";
+    ctx.font = "30px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Игра окончена!", canvas.width / 2, canvas.height / 2);
+    ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 + 40);
+    // Отправка очков на сервер
+    sendScore();
+    return;
+  }
+
   snakePosX += velocityX;
   snakePosY += velocityY;
 
@@ -37,7 +62,8 @@ function gameLoop() {
 
     // Столкновение с собой
     if (part.x === snakePosX && part.y === snakePosY) {
-      snakeLength = 4;
+      gameOver = true;
+      return;
     }
   }
 
@@ -53,9 +79,15 @@ function gameLoop() {
   // Если съели еду
   if (snakePosX === foodX && snakePosY === foodY) {
     snakeLength++;
+    score += 10; // Увеличение счёта при поедании еды
     foodX = Math.floor(Math.random() * tileCount);
     foodY = Math.floor(Math.random() * tileCount);
   }
+
+  // Отрисовка HUD
+  drawHUD();
+
+  setTimeout(gameLoop, 100);
 }
 
 function keyPress(evt) {
@@ -84,4 +116,26 @@ function keyPress(evt) {
 }
 
 document.addEventListener("keydown", keyPress);
-setInterval(gameLoop, 100);
+
+// Функция отправки очков на сервер
+function sendScore() {
+  fetch('/score', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      game_type: 'snake',
+      score: score
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Score sent:', data);
+  })
+  .catch((error) => {
+    console.error('Error:', error);
+  });
+}
+
+gameLoop();

@@ -1,3 +1,4 @@
+// cmd/main.go
 package main
 
 import (
@@ -7,7 +8,8 @@ import (
 )
 
 func main() {
-	if err := app.RunServer(); err != nil {
-		log.Fatal(err)
+	err := app.RunServer()
+	if err != nil {
+		log.Fatalf("Не удалось запустить сервер: %v", err)
 	}
 }

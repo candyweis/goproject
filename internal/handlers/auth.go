@@ -1,93 +1,171 @@
+// internal/handlers/auth.go
 package handlers
 
 import (
 	"database/sql"
+	"html/template"
+	"log"
 	"net/http"
 
-	"my-go-project/internal/database"
 	"my-go-project/internal/session"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-// LogoutHandler очищает сессию и редиректит на главную
-func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	sess, _ := session.Store.Get(r, "my-session")
-	sess.Values["user"] = ""
-	sess.Save(r, w)
-	http.Redirect(w, r, "/", http.StatusFound)
-}
-
-// RegisterPage: GET показывает форму, POST создаёт пользователя в БД
+// RegisterPage обрабатывает регистрацию пользователя
 func RegisterPage(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			renderTemplate(w, "register.html", nil)
+		if r.Method == http.MethodGet {
+			tmpl, err := template.ParseFiles("templates/layout.html", "templates/register.html")
+			if err != nil {
+				log.Printf("Ошибка при парсинге шаблонов: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
+			err = tmpl.ExecuteTemplate(w, "layout", nil)
+			if err != nil {
+				log.Printf("Ошибка при выполнении шаблона: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
+			return
+		}
 
-		case http.MethodPost:
+		if r.Method == http.MethodPost {
 			email := r.FormValue("email")
 			password := r.FormValue("password")
 
-			// Проверяем, есть ли такой email
-			var exists bool
-			err := db.QueryRow("SELECT EXISTS (SELECT 1 FROM users WHERE email=$1)", email).Scan(&exists)
-			if err != nil {
-				http.Error(w, "DB error", http.StatusInternalServerError)
-				return
-			}
-			if exists {
-				renderTemplate(w, "register.html", "Пользователь с таким E-mail уже существует.")
+			// Валидация данных
+			if email == "" || password == "" {
+				http.Error(w, "Email и пароль обязательны", http.StatusBadRequest)
 				return
 			}
 
-			// Вставляем запись
-			_, err = db.Exec("INSERT INTO users (email, password) VALUES ($1, $2)", email, password)
+			// Хэширование пароля
+			hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 			if err != nil {
-				http.Error(w, "DB error", http.StatusInternalServerError)
+				log.Printf("Ошибка при хэшировании пароля: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
 				return
 			}
-			// Редирект на логин
-			http.Redirect(w, r, "/login", http.StatusFound)
+
+			// Вставка пользователя в базу данных
+			_, err = db.Exec("INSERT INTO users (email, password) VALUES ($1, $2)", email, string(hashedPassword))
+			if err != nil {
+				log.Printf("Ошибка при вставке пользователя: %v", err)
+				http.Error(w, "Ошибка при регистрации", http.StatusInternalServerError)
+				return
+			}
+
+			// Установка сессии
+			sess, err := session.Store.Get(r, "my-session")
+			if err != nil {
+				log.Printf("Ошибка при получении сессии: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
+			sess.Values["user"] = email
+			err = sess.Save(r, w)
+			if err != nil {
+				log.Printf("Ошибка при сохранении сессии: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
+
+			// Перенаправление на страницу профиля
+			http.Redirect(w, r, "/profile", http.StatusSeeOther)
 		}
 	}
 }
 
-// LoginPage: GET — форма входа, POST — проверка логина и пароля
+// LoginPage обрабатывает вход пользователя
 func LoginPage(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			renderTemplate(w, "login.html", nil)
+		if r.Method == http.MethodGet {
+			tmpl, err := template.ParseFiles("templates/layout.html", "templates/login.html")
+			if err != nil {
+				log.Printf("Ошибка при парсинге шаблонов: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
+			err = tmpl.ExecuteTemplate(w, "layout", nil)
+			if err != nil {
+				log.Printf("Ошибка при выполнении шаблона: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
+			return
+		}
 
-		case http.MethodPost:
+		if r.Method == http.MethodPost {
 			email := r.FormValue("email")
 			password := r.FormValue("password")
 
-			var user database.User
-			err := db.QueryRow(
-				"SELECT id, email, password FROM users WHERE email=$1", email,
-			).Scan(&user.ID, &user.Email, &user.Password)
+			// Валидация данных
+			if email == "" || password == "" {
+				http.Error(w, "Email и пароль обязательны", http.StatusBadRequest)
+				return
+			}
 
+			// Получение хэшированного пароля из базы данных
+			var storedHashedPassword string
+			err := db.QueryRow("SELECT password FROM users WHERE email=$1", email).Scan(&storedHashedPassword)
 			if err != nil {
 				if err == sql.ErrNoRows {
-					renderTemplate(w, "login.html", "Пользователь не найден")
+					http.Error(w, "Неверный email или пароль", http.StatusUnauthorized)
 				} else {
-					http.Error(w, "DB error", http.StatusInternalServerError)
+					log.Printf("Ошибка при запросе пользователя: %v", err)
+					http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
 				}
 				return
 			}
 
-			// Сравниваем пароли (в реальном проекте — bcrypt и т.п.)
-			if user.Password != password {
-				renderTemplate(w, "login.html", "Неверный пароль")
+			// Сравнение паролей
+			err = bcrypt.CompareHashAndPassword([]byte(storedHashedPassword), []byte(password))
+			if err != nil {
+				http.Error(w, "Неверный email или пароль", http.StatusUnauthorized)
 				return
 			}
 
-			// Если ок, кладём в сессию
-			sess, _ := session.Store.Get(r, "my-session")
-			sess.Values["user"] = user.Email
-			sess.Save(r, w)
+			// Установка сессии
+			sess, err := session.Store.Get(r, "my-session")
+			if err != nil {
+				log.Printf("Ошибка при получении сессии: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
+			sess.Values["user"] = email
+			err = sess.Save(r, w)
+			if err != nil {
+				log.Printf("Ошибка при сохранении сессии: %v", err)
+				http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+				return
+			}
 
-			http.Redirect(w, r, "/game/choose", http.StatusFound)
+			// Перенаправление на страницу профиля
+			http.Redirect(w, r, "/profile", http.StatusSeeOther)
 		}
 	}
+}
+
+// LogoutHandler обрабатывает выход пользователя из системы
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	sess, err := session.Store.Get(r, "my-session")
+	if err != nil {
+		log.Printf("Ошибка при получении сессии: %v", err)
+		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	// Удаление пользователя из сессии
+	delete(sess.Values, "user")
+	err = sess.Save(r, w)
+	if err != nil {
+		log.Printf("Ошибка при сохранении сессии: %v", err)
+		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		return
+	}
+
+	// Перенаправление на главную страницу
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

@@ -1,5 +1,7 @@
+<!-- templates/snake.html -->
 {{ define "content" }}
-<h2>Snake</h2>
+<div id="score">Очки: 0</div>
+<div id="gameOver" style="display:none;">Игра окончена! Нажмите F5 для перезапуска.</div>
 <canvas id="snakeCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
 <script src="/static/js/snake.js"></script>
 {{ end }}

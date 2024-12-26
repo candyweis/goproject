@@ -1,14 +1,13 @@
+<!-- templates/login.html -->
 {{ define "content" }}
 <h2>Вход</h2>
 <form method="POST" action="/login">
-  <label>Email:</label><br/>
-  <input type="email" name="email" required/><br/><br/>
+    <label for="email">Email:</label><br/>
+    <input type="email" id="email" name="email" required/><br/><br/>
 
-  <label>Пароль:</label><br/>
-  <input type="password" name="password" required/><br/><br/>
+    <label for="password">Пароль:</label><br/>
+    <input type="password" id="password" name="password" required/><br/><br/>
 
-  {{ if . }}<p style="color:red;">{{ . }}</p>{{ end }}
-
-  <button type="submit">Войти</button>
+    <input type="submit" value="Войти"/>
 </form>
 {{ end }}

@@ -1,0 +1,12 @@
+<!-- templates/profile.html -->
+{{ define "content" }}
+<h2>Профиль пользователя</h2>
+<p>Email: {{ .Email }}</p>
+<div class="score-section">
+    <h3>Лучшие очки:</h3>
+    <ul>
+        <li>Змейка: {{ .BestScores.snake }}</li>
+        <li>Шутер: {{ .BestScores.shooter }}</li>
+    </ul>
+</div>
+{{ end }}

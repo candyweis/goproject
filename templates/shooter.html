@@ -1,5 +1,6 @@
 {{ define "content" }}
-<h2>Shooter</h2>
-<canvas id="shooterCanvas" width="400" height="400" style="border:1px solid #000;"></canvas>
+<div id="score">Очки: 0 | Лучший: 0 | Жизни: 3</div>
+<div id="gameOver" style="display:none;">Игра окончена! Ваш счет: 0. Нажмите F5 для перезапуска.</div>
+<canvas id="shooterCanvas" width="800" height="600"></canvas>
 <script src="/static/js/shooter.js"></script>
 {{ end }}
